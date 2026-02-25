@@ -1,22 +1,47 @@
-name: Build  Kidsnote Backup
+name: Build 키즈노트백업
 
 on:
   push:
-      branches:
-            - main
-              workflow_dispatch:
+    tags:
+      - 'v*'
+  workflow_dispatch:
 
-              jobs:
-                build-windows:
-                    runs-on: windows-latest
-                        steps:
-                              - uses: actions/checkout@v4
-                                    - uses: actions/setup-python@v5
-                                            with:
-                                                      python-version: '3.12'
-                                                            - run: pip install requests pyinstaller
-                                                                  - name: Build Windows EXE
-                                                                          run: python -m PyInstaller --onefile --noconsole --name=kidsnote_backup --add-data "kidsnote_backup.py;." --noconfirm --clean kidsnote_app.py
-                                                                                - uses: actions/upload-artifact@v4
-                                                                                        with:
-                                                                                                  name: kidsnote_backup_windows                                                                                                            path: dist/kidsnote_backup.exe                                                                                                            
+jobs:
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install requests pyinstaller
+      - run: |
+          python -m PyInstaller --onedir \
+            --name=키즈노트백업 \
+            --add-data "kidsnote_backup.py:." \
+            --noconfirm --clean \
+            kidsnote_app.py
+      - run: cd dist && zip -r 키즈노트백업_Mac.zip 키즈노트백업
+      - uses: actions/upload-artifact@v4
+        with:
+          name: 키즈노트백업_Mac
+          path: dist/키즈노트백업_Mac.zip
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install requests pyinstaller
+      - run: |
+          python -m PyInstaller --onefile `
+            --name=키즈노트백업 `
+            --add-data "kidsnote_backup.py;." `
+            --noconfirm --clean `
+            kidsnote_app.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: 키즈노트백업_Windows
+          path: dist/키즈노트백업.exe
