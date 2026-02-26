@@ -23,6 +23,9 @@ if getattr(sys, 'frozen', False):
 
 from kidsnote_backup import KidsnoteBackup
 
+# 라이선스 API URL (Google Apps Script 배포 URL)
+LICENSE_API_URL = "https://script.google.com/macros/s/여기에_배포ID_입력/exec"
+
 # 서버 포트
 PORT = 18585
 
@@ -210,12 +213,67 @@ input:focus {
 }
 .btn-open:hover { background: #45a049; }
 .btn-open.show { display: block; }
+.license-section {
+    background: #f8f9fa;
+    border: 2px solid #e0e0e0;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 24px;
+}
+.license-section.verified {
+    border-color: #4CAF50;
+    background: #f0f9f0;
+}
+.license-row {
+    display: flex;
+    gap: 8px;
+}
+.license-row input {
+    flex: 1;
+    margin-bottom: 0;
+}
+.btn-verify {
+    padding: 12px 20px;
+    background: #4a90d9;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.2s;
+}
+.btn-verify:hover:not(:disabled) { background: #3a7bc8; }
+.btn-verify:disabled { opacity: 0.5; cursor: not-allowed; }
+.license-msg {
+    font-size: 13px;
+    margin-top: 10px;
+    font-weight: 500;
+}
+.license-msg.success { color: #4CAF50; }
+.license-msg.error { color: #d94a4a; }
+.disabled-overlay {
+    opacity: 0.5;
+    pointer-events: none;
+}
 </style>
 </head>
 <body>
 <div class="container">
     <h1>키즈노트 백업 프로그램</h1>
 
+    <div class="license-section" id="licenseSection">
+        <div class="section-title">라이선스 인증</div>
+        <label for="licenseKey">라이선스 키</label>
+        <div class="license-row">
+            <input type="text" id="licenseKey" placeholder="KN-XXXX-XXXX">
+            <button class="btn-verify" id="verifyBtn" onclick="verifyLicense()">인증</button>
+        </div>
+        <div class="license-msg" id="licenseMsg"></div>
+    </div>
+
+    <div id="mainContent" class="disabled-overlay">
     <div class="section">
         <div class="section-title">로그인 정보</div>
         <label for="email">아이디</label>
@@ -236,6 +294,7 @@ input:focus {
         <button class="btn btn-start" id="startBtn" onclick="startBackup()">백업 시작</button>
         <button class="btn btn-stop" id="stopBtn" onclick="stopBackup()" disabled>중지</button>
     </div>
+    </div>
 
     <div class="progress-wrap">
         <div class="progress-bar" id="progressBar"></div>
@@ -254,13 +313,57 @@ input:focus {
 <script>
 let pollTimer = null;
 let logIndex = 0;
+let licenseKey = '';
+let licenseVerified = false;
 
 // 기본 저장 경로 가져오기
 fetch('/api/default_path')
     .then(r => r.json())
     .then(d => { document.getElementById('output').value = d.path; });
 
+function verifyLicense() {
+    const key = document.getElementById('licenseKey').value.trim();
+    if (!key) { alert('라이선스 키를 입력해주세요.'); return; }
+
+    const msg = document.getElementById('licenseMsg');
+    const btn = document.getElementById('verifyBtn');
+    btn.disabled = true;
+    msg.textContent = '인증 중...';
+    msg.className = 'license-msg';
+
+    fetch('/api/verify_license', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({key: key})
+    })
+    .then(r => r.json())
+    .then(d => {
+        if (d.ok) {
+            licenseKey = key;
+            licenseVerified = true;
+            msg.textContent = '인증 완료 (남은 횟수: ' + d.remaining + '/' + d.max + ')';
+            msg.className = 'license-msg success';
+            document.getElementById('licenseSection').classList.add('verified');
+            document.getElementById('licenseKey').disabled = true;
+            btn.disabled = true;
+            btn.textContent = '인증됨';
+            document.getElementById('mainContent').classList.remove('disabled-overlay');
+        } else {
+            btn.disabled = false;
+            msg.textContent = d.error;
+            msg.className = 'license-msg error';
+        }
+    })
+    .catch(() => {
+        btn.disabled = false;
+        msg.textContent = '서버 연결 실패. 인터넷 연결을 확인해주세요.';
+        msg.className = 'license-msg error';
+    });
+}
+
 function startBackup() {
+    if (!licenseVerified) { alert('라이선스 인증이 필요합니다.'); return; }
+
     const email = document.getElementById('email').value.trim();
     const password = document.getElementById('password').value.trim();
     const output = document.getElementById('output').value.trim();
@@ -278,10 +381,22 @@ function startBackup() {
     fetch('/api/start', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({email, password, output})
+        body: JSON.stringify({email, password, output, license_key: licenseKey})
+    })
+    .then(r => r.json())
+    .then(d => {
+        if (!d.ok) {
+            alert(d.error || '라이선스 사용 처리에 실패했습니다.');
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            return;
+        }
+        pollTimer = setInterval(pollStatus, 500);
+    })
+    .catch(() => {
+        alert('서버 연결 실패');
+        document.getElementById('startBtn').disabled = false;
     });
-
-    pollTimer = setInterval(pollStatus, 500);
 }
 
 function stopBackup() {
@@ -392,9 +507,20 @@ class RequestHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         parsed = urlparse(self.path)
 
-        if parsed.path == '/api/start':
+        if parsed.path == '/api/verify_license':
             content_len = int(self.headers.get('Content-Length', 0))
             body = json.loads(self.rfile.read(content_len))
+            result = verify_license(body['key'])
+            self._send_json(result)
+
+        elif parsed.path == '/api/start':
+            content_len = int(self.headers.get('Content-Length', 0))
+            body = json.loads(self.rfile.read(content_len))
+            # 라이선스 사용횟수 차감
+            license_result = use_license(body.get('license_key', ''))
+            if not license_result.get('ok'):
+                self._send_json({'ok': False, 'error': license_result.get('error', '라이선스 오류')})
+                return
             start_backup(body['email'], body['password'], body['output'])
             self._send_json({'ok': True})
 
@@ -522,6 +648,32 @@ def browse_folder():
     except Exception:
         pass
     return ''
+
+
+def verify_license(key):
+    """Google Apps Script API로 라이선스 키 검증"""
+    import urllib.request
+    import urllib.parse
+    try:
+        url = LICENSE_API_URL + '?' + urllib.parse.urlencode({'action': 'verify', 'key': key})
+        req = urllib.request.Request(url)
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            return json.loads(resp.read().decode('utf-8'))
+    except Exception as e:
+        return {'ok': False, 'error': f'서버 연결 실패: {e}'}
+
+
+def use_license(key):
+    """Google Apps Script API로 라이선스 사용횟수 차감"""
+    import urllib.request
+    import urllib.parse
+    try:
+        url = LICENSE_API_URL + '?' + urllib.parse.urlencode({'action': 'use', 'key': key})
+        req = urllib.request.Request(url)
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            return json.loads(resp.read().decode('utf-8'))
+    except Exception as e:
+        return {'ok': False, 'error': f'라이선스 처리 실패: {e}'}
 
 
 def open_folder():
