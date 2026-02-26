@@ -1,0 +1,22 @@
+name: Build  Kidsnote Backup
+
+on:
+  push:
+      branches:
+            - main
+              workflow_dispatch:
+
+              jobs:
+                build-windows:
+                    runs-on: windows-latest
+                        steps:
+                              - uses: actions/checkout@v4
+                                    - uses: actions/setup-python@v5
+                                            with:
+                                                      python-version: '3.12'
+                                                            - run: pip install requests pyinstaller
+                                                                  - name: Build Windows EXE
+                                                                          run: python -m PyInstaller --onefile --noconsole --name=kidsnote_backup --add-data "kidsnote_backup.py;." --noconfirm --clean kidsnote_app.py
+                                                                                - uses: actions/upload-artifact@v4
+                                                                                        with:
+                                                                                                  name: kidsnote_backup_windows                                                                                                            path: dist/kidsnote_backup.exe                                                                                                            
