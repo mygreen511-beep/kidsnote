@@ -31,7 +31,7 @@ if %errorlevel% neq 0 (
 
 echo.
 echo [2/4] 필요한 라이브러리 설치 중...
-pip install requests pyinstaller --quiet
+pip install -r requirements.txt --quiet
 echo 라이브러리 설치 완료!
 
 echo.
