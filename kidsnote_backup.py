@@ -24,8 +24,12 @@ REPORTS_URL = f"{BASE_URL}/v1_2/children/{{child_id}}/reports/"
 
 def sanitize_filename(name):
     """파일/폴더명에 사용할 수 없는 문자 제거"""
+    name = name.replace('\n', ' ').replace('\r', ' ')
+    name = re.sub(r'[\x00-\x1f\x7f]', '', name)
     name = re.sub(r'[<>:"/\\|?*]', '_', name)
     name = name.strip('. ')
+    if len(name) > 200:
+        name = name[:200]
     return name or 'untitled'
 
 
