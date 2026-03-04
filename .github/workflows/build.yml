@@ -16,11 +16,11 @@ jobs:
           python-version: '3.12'
       - run: pip install -r requirements.txt
       - run: python build.py
-      - run: cd dist && zip -r 키즈노트백업_Mac.zip 키즈노트백업
+      - run: cd dist && zip -r kidsnote_mac.zip */
       - uses: actions/upload-artifact@v4
         with:
-          name: 키즈노트백업_Mac
-          path: dist/키즈노트백업_Mac.zip
+          name: kidsnote-mac
+          path: dist/kidsnote_mac.zip
 
   build-windows:
     runs-on: windows-latest
@@ -35,10 +35,13 @@ jobs:
       - run: pip install -r requirements.txt
       - run: chcp 65001 && python build.py
         shell: cmd
+      - run: |
+          for %%f in (dist\*.exe) do move "%%f" "dist\kidsnote_backup.exe"
+        shell: cmd
       - uses: actions/upload-artifact@v4
         with:
-          name: 키즈노트백업_Windows
-          path: dist/키즈노트백업.exe
+          name: kidsnote-windows
+          path: dist/kidsnote_backup.exe
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
@@ -50,8 +53,9 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
+      - run: ls -R artifacts/
       - uses: softprops/action-gh-release@v2
         with:
           files: |
-            artifacts/키즈노트백업_Mac/키즈노트백업_Mac.zip
-            artifacts/키즈노트백업_Windows/키즈노트백업.exe
+            artifacts/kidsnote-mac/kidsnote_mac.zip
+            artifacts/kidsnote-windows/kidsnote_backup.exe
