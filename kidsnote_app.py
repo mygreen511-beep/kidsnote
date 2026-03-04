@@ -626,18 +626,15 @@ def browse_folder():
             if result.returncode == 0:
                 return result.stdout.strip().rstrip('/')
         elif system == "Windows":
-            ps_cmd = (
-                "[System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms') | Out-Null;"
-                "$dlg = New-Object System.Windows.Forms.FolderBrowserDialog;"
-                "$dlg.Description = '백업 저장 위치 선택';"
-                "if ($dlg.ShowDialog() -eq 'OK') { $dlg.SelectedPath }"
-            )
-            result = subprocess.run(
-                ['powershell', '-Command', ps_cmd],
-                capture_output=True, text=True, timeout=120
-            )
-            if result.returncode == 0 and result.stdout.strip():
-                return result.stdout.strip()
+            import tkinter as tk
+            from tkinter import filedialog
+            root = tk.Tk()
+            root.withdraw()
+            root.attributes('-topmost', True)
+            folder = filedialog.askdirectory(title='백업 저장 위치 선택')
+            root.destroy()
+            if folder:
+                return folder.replace('/', '\\')
         else:
             result = subprocess.run(
                 ['zenity', '--file-selection', '--directory', '--title=백업 저장 위치 선택'],
