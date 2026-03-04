@@ -24,7 +24,7 @@ if getattr(sys, 'frozen', False):
 from kidsnote_backup import KidsnoteBackup
 
 # 라이선스 API URL (Google Apps Script 배포 URL)
-LICENSE_API_URL = "https://script.google.com/macros/s/여기에_배포ID_입력/exec"
+LICENSE_API_URL = "https://script.google.com/macros/s/AKfycbxD_N0bQXRH7uwsUpzG42Kt_G9M2We_pg_aBzteuiRRU-Wsb9K_1JsR8lLuKItfo-Tmgg/exec"
 
 # 서버 포트
 PORT = 18585
@@ -652,26 +652,20 @@ def browse_folder():
 
 def verify_license(key):
     """Google Apps Script API로 라이선스 키 검증"""
-    import urllib.request
-    import urllib.parse
+    import requests as req_lib
     try:
-        url = LICENSE_API_URL + '?' + urllib.parse.urlencode({'action': 'verify', 'key': key})
-        req = urllib.request.Request(url)
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            return json.loads(resp.read().decode('utf-8'))
+        resp = req_lib.get(LICENSE_API_URL, params={'action': 'verify', 'key': key}, timeout=15)
+        return resp.json()
     except Exception as e:
         return {'ok': False, 'error': f'서버 연결 실패: {e}'}
 
 
 def use_license(key):
     """Google Apps Script API로 라이선스 사용횟수 차감"""
-    import urllib.request
-    import urllib.parse
+    import requests as req_lib
     try:
-        url = LICENSE_API_URL + '?' + urllib.parse.urlencode({'action': 'use', 'key': key})
-        req = urllib.request.Request(url)
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            return json.loads(resp.read().decode('utf-8'))
+        resp = req_lib.get(LICENSE_API_URL, params={'action': 'use', 'key': key}, timeout=15)
+        return resp.json()
     except Exception as e:
         return {'ok': False, 'error': f'라이선스 처리 실패: {e}'}
 
